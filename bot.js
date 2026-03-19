@@ -1,24 +1,31 @@
 const { Telegraf, Markup } = require('telegraf');
 const http = require('http');
 
-// Creăm un server minim ca să nu mai dea Render eroare de Port
+// Server minim pentru a menține serviciul activ pe Render
 const server = http.createServer((req, res) => {
     res.writeHead(200);
-    res.end('Sentinel Sniper is Active');
+    res.end('Sentinel Core Online');
 });
 server.listen(process.env.PORT || 3000);
 
-const bot = new Telegraf('8561401872:AAF-s8kvSzpPCBGuybhKwkXQRwt-_bemuXI');
+// Botul extrage token-ul direct din setările Render (Environment Variables)
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 bot.start((ctx) => {
-    ctx.replyWithMarkdown('🛡️ **SENTINEL CORE V1.0**\n[SYSTEM ONLINE]', Markup.inlineKeyboard([
-        [Markup.button.callback('🚀 START SNIPER', 'start')],
-        [Markup.button.callback('💰 MY WALLET', 'wallet')]
+    ctx.replyWithMarkdown('🛡️ **SENTINEL CORE V1.0**\n[SYSTEM ONLINE]\n\nTerminal activat. Aștept comenzi.', Markup.inlineKeyboard([
+        [Markup.button.callback('🚀 START SNIPER', 'start_sniper')],
+        [Markup.button.callback('💰 MY WALLET', 'view_wallet')]
     ]));
 });
 
-bot.launch().then(() => console.log(">>> BOTUL ESTE ACTIV <<<"));
+bot.action('view_wallet', (ctx) => {
+    ctx.reply('🏦 Generare portofel securizat... (Modulul Web3 va fi activat la următorul update)');
+});
 
-// Oprire curata
+bot.launch()
+    .then(() => console.log(">>> SENTINEL ESTE ONLINE ȘI ASCULTĂ <<<"))
+    .catch((err) => console.error("Eroare la pornire:", err));
+
+// Oprire curată a procesului
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
