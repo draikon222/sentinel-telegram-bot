@@ -1,6 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 
-// Aici punem token-ul tau pe care l-ai luat de la BotFather
+// TOKEN-UL EXACT DIN POZA TA
 const bot = new Telegraf('8561401872:AAF-s8kvSzpPCBGuybhKwkXQRwt-_bemuXI');
 
 const welcomeMessage = `
@@ -21,8 +21,11 @@ bot.start((ctx) => {
 });
 
 bot.action('view_wallet', (ctx) => {
-    ctx.reply(`🏦 WALLET DEPOSIT (SOL):\n\nYour dedicated Sentinel wallet:\n[GENERATE IN PROGRESS]\n\nBalance: 0.00 SOL`);
+    ctx.reply(`🏦 WALLET DEPOSIT (SOL):\n\nYour dedicated Sentinel wallet:\n[GENERATING...]\n\nBalance: 0.00 SOL`);
 });
 
-bot.launch();
-console.log("Sentinel Core is live on Telegram!");
+bot.launch().then(() => {
+    console.log("Sentinel Core is live on Telegram!");
+}).catch((err) => {
+    console.error("Error starting bot:", err);
+});
