@@ -1,22 +1,20 @@
 const { Telegraf, Markup } = require('telegraf');
 
-// Citim token-ul din setarile Render (mai sigur)
-const bot = new Telegraf(process.env.BOT_TOKEN);
-
-const welcomeMessage = `
-🛡️ **SENTINEL CORE V1.0**
-[SECURED ACCESS]
---------------------------
-SYSTEM: ONLINE
---------------------------
-Ready for commands, operator.
-`;
+// TOKEN PUS DIRECT (Fara spatii, fara erori)
+const bot = new Telegraf('8561401872:AAF-s8kvSzpPCBGuybhKwkXQRwt-_bemuXI');
 
 bot.start((ctx) => {
-    ctx.replyWithMarkdown(welcomeMessage, Markup.inlineKeyboard([
-        [Markup.button.callback('🚀 START SNIPER', 'start_sniper')],
-        [Markup.button.callback('💰 MY WALLET', 'view_wallet')]
+    ctx.replyWithMarkdown('🛡️ **SENTINEL CORE V1.0**\n[ONLINE]', Markup.inlineKeyboard([
+        [Markup.button.callback('🚀 START SNIPER', 'start')],
+        [Markup.button.callback('💰 WALLET', 'wallet')]
     ]));
 });
 
-bot.launch().then(() => console.log("Bot is LIVE!"));
+// Pornire cu log de confirmare
+bot.launch()
+  .then(() => console.log(">>> BOTUL ESTE PORNIT SI FUNCTIONAL! <<<"))
+  .catch((err) => console.log("EROARE START:", err.message));
+
+// Evitam inchiderea botului
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
