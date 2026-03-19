@@ -1,7 +1,12 @@
 {
-  "name": "sentinel-bot",
+  "name": "sentinel-telegram-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Sentinel Sniper Bot Core",
   "main": "bot.js",
   "scripts": {
-    "start
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3"
+  }
+}
