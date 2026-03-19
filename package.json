@@ -1,0 +1,11 @@
+{
+  "name": "sentinel-core-bot",
+  "version": "1.0.0",
+  "description": "Real Solana Sniper Bot",
+  "main": "bot.js",
+  "dependencies": {
+    "telegraf": "^4.15.3",
+    "dotenv": "^16.3.1",
+    "@solana/web3.js": "^1.87.0"
+  }
+}
