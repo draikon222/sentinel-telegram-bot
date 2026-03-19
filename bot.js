@@ -1,31 +1,22 @@
 const { Telegraf, Markup } = require('telegraf');
 
-// TOKEN-UL EXACT DIN POZA TA
-const bot = new Telegraf('8561401872:AAF-s8kvSzpPCBGuybhKwkXQRwt-_bemuXI');
+// Citim token-ul din setarile Render (mai sigur)
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const welcomeMessage = `
 🛡️ **SENTINEL CORE V1.0**
-[SECURED ACCESS GRANTED]
+[SECURED ACCESS]
 --------------------------
-SYSTEM STATUS: ONLINE
-NODE STATUS: READY
+SYSTEM: ONLINE
 --------------------------
-Welcome, operator. Use the dashboard below to manage your assets and sniper settings.
+Ready for commands, operator.
 `;
 
 bot.start((ctx) => {
     ctx.replyWithMarkdown(welcomeMessage, Markup.inlineKeyboard([
         [Markup.button.callback('🚀 START SNIPER', 'start_sniper')],
-        [Markup.button.callback('💰 MY WALLET', 'view_wallet'), Markup.button.callback('⚙️ SETTINGS', 'settings')]
+        [Markup.button.callback('💰 MY WALLET', 'view_wallet')]
     ]));
 });
 
-bot.action('view_wallet', (ctx) => {
-    ctx.reply(`🏦 WALLET DEPOSIT (SOL):\n\nYour dedicated Sentinel wallet:\n[GENERATING...]\n\nBalance: 0.00 SOL`);
-});
-
-bot.launch().then(() => {
-    console.log("Sentinel Core is live on Telegram!");
-}).catch((err) => {
-    console.error("Error starting bot:", err);
-});
+bot.launch().then(() => console.log("Bot is LIVE!"));
