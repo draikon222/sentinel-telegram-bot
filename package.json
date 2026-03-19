@@ -1,12 +1,10 @@
 {
   "name": "sentinel-bot",
-  "version": "1.0.0",
-  "description": "Solana Sniper Bot",
+  "version": "2.0.0",
   "main": "bot.js",
   "dependencies": {
     "telegraf": "^4.12.2",
-    "@solana/web3.js": "^1.91.1",
-    "node-fetch": "^2.6.1"
+    "@solana/web3.js": "^1.91.1"
   },
   "scripts": {
     "start": "node bot.js"
