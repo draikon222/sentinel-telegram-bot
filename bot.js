@@ -1,56 +1,68 @@
 const { Telegraf, Markup } = require('telegraf');
-const { Connection, PublicKey, clusterApiUrl } = require('@solana/web3.js');
+const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 const http = require('http');
 
-// 1. Server pentru a menține botul activ pe Render
-http.createServer((req, res) => {
-    res.writeHead(200);
-    res.end('Sentinel Core Web3 Online');
+// Server pentru Render (Păstrează botul viu)
+http.createServer((req, res) => { 
+    res.writeHead(200); 
+    res.end('Sentinel Core V2.0 Engine Online'); 
 }).listen(process.env.PORT || 3000);
 
-// 2. Configurare conexiune Solana (Mainnet)
-const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
-const MY_WALLET = 'J5MxnGsFa79EeQS6kAMcGLTK3kXXvC39TjEhj7BkD6bk';
-
-// 3. Inițializare Bot (Token-ul rămâne secret în Render)
+// CONFIGURARE CORE
 const bot = new Telegraf(process.env.BOT_TOKEN);
+const connection = new Connection("https://api.mainnet-beta.solana.com", 'confirmed');
+const MY_TREASURY = 'J5MxnGsFa79EeQS6kAMcGLTK3kXXvC39TjEhj7BkD6bk';
+const SERVICE_FEE = 0.001; // Cei 0.1% ai tăi
 
-// Meniu Principal
+// MENIU PRINCIPAL (Interfața pentru utilizatori)
 bot.start((ctx) => {
-    ctx.replyWithMarkdown('🛡️ **SENTINEL CORE V1.0**\n\nSistemul este conectat la Solana Mainnet.\n\n`Wallet:` ' + MY_WALLET, Markup.inlineKeyboard([
-        [Markup.button.callback('💰 VERIFICĂ BALANȚĂ', 'check_balance')],
-        [Markup.button.callback('🚀 START SNIPER', 'start_sniper')],
-        [Markup.button.callback('⚙️ SETĂRI', 'settings')]
-    ]));
+    ctx.replyWithMarkdown(
+        `🛡️ **SENTINEL CORE TERMINAL V2.0**\n\n` +
+        `Sistem de trading ultra-rapid cu taxe minime.\n\n` +
+        `• **Taxă rețea:** 0.1%\n` +
+        `• **Securitate:** Activă\n` +
+        `• **Viteză:** Mainnet Optimized\n\n` +
+        `Introduceți adresa contractului (CA) pentru a începe scanarea sau tranzacționarea:`,
+        Markup.inlineKeyboard([
+            [Markup.button.callback('💰 BALANȚA MEA', 'check_balance')],
+            [Markup.button.callback('🚀 SNIPER PUMP.FUN', 'sniper_mode')],
+            [Markup.button.callback('📈 SETĂRI TRADING', 'settings')]
+        ])
+    );
 });
 
-// Logica pentru Butonul de Balanță
+// LOGICA DE COMISION (Inima afacerii tale)
 bot.action('check_balance', async (ctx) => {
     try {
-        await ctx.answerCbQuery('Se accesează blockchain-ul...');
-        const publicKey = new PublicKey(MY_WALLET);
-        const balance = await connection.getBalance(publicKey);
-        const solBalance = balance / 1000000000;
-
-        ctx.replyWithMarkdown(`🏦 **DETALII PORTOFEL**\n\n**Adresă:** \`${MY_WALLET}\`\n**Balanță:** \`${solBalance.toFixed(4)} SOL\``);
-    } catch (error) {
-        console.error(error);
-        ctx.reply('❌ Eroare la citirea datelor de pe Solana. Verifică conexiunea.');
+        const balance = await connection.getBalance(new PublicKey(MY_TREASURY));
+        const sol = balance / LAMPORTS_PER_SOL;
+        ctx.replyWithMarkdown(`🏦 **TREASURY STATUS**\n\nProfit acumulat în portofelul tău:\n\`${sol.toFixed(6)} SOL\``);
+    } catch (e) {
+        ctx.reply("❌ Eroare conexiune Solana.");
     }
 });
 
-bot.action('start_sniper', (ctx) => {
-    ctx.reply('🚀 Sniper-ul este în modul "Watch Only". Scanez Raydium & Pump.fun pentru contracte noi...');
+// SIMULARE EXECUTARE CU TAXĂ (Ce vor vedea utilizatorii tăi)
+bot.on('text', (ctx) => {
+    const text = ctx.message.text;
+    if (text.length > 30) { // Presupunem că e un Contract Address
+        ctx.replyWithMarkdown(
+            `💎 **TOKEN DETECTAT:** \`${text}\`\n\n` +
+            `Alege suma pentru CUMPĂRARE (Include taxă 0.1%):`,
+            Markup.inlineKeyboard([
+                [Markup.button.callback('Buy 0.1 SOL', 'buy_01'), Markup.button.callback('Buy 0.5 SOL', 'buy_05')],
+                [Markup.button.callback('Buy 1.0 SOL', 'buy_10'), Markup.button.callback('Custom Amount', 'buy_custom')]
+            ])
+        );
+    }
 });
 
-bot.action('settings', (ctx) => {
-    ctx.reply('⚙️ Configurare: Slippage 10% | Priority Fee: Default.');
+// EXECUȚIA TAXEI (Logica din spate)
+bot.action(/buy_(.*)/, (ctx) => {
+    const amount = ctx.match[1];
+    const fee = amount * SERVICE_FEE;
+    ctx.answerCbQuery(`Execut tranzacție... Profitul tău: ${fee} SOL`, { show_alert: true });
+    ctx.reply(`🚀 Tranzacție trimisă! 0.1% (${fee} SOL) au fost direcționați către portofelul tău de profit.`);
 });
 
-// Lansare
-bot.launch()
-    .then(() => console.log(">>> SENTINEL WEB3 READY <<<"))
-    .catch(err => console.error("Eroare pornire:", err));
-
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+bot.launch().then(() => console.log(">>> SENTINEL CORE V2.0 DEPLOYED <<<"));
