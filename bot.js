@@ -2,27 +2,26 @@ const { Telegraf } = require('telegraf');
 const mongoose = require('mongoose');
 const http = require('http');
 
-// Server minim pentru a păstra Render activ
+// 1. Server pentru Render (Port Binding)
 http.createServer((req, res) => {
   res.writeHead(200);
-  res.end('Sentinel Online');
+  res.end('Sentinel Core Active');
 }).listen(process.env.PORT || 3000);
 
-// Conectare MongoDB
+// 2. Conectare MongoDB
 const mongoURI = "mongodb+srv://draikon:Gioniluca1980@cluster0.zc3ggbq.mongodb.net/?appName=Cluster0";
-mongoose.connect(mongoURI)
-  .then(() => console.log("DB_OK"))
-  .catch(err => console.log("DB_ERR:", err));
+mongoose.connect(mongoURI).then(() => console.log("✅ SEIF MONGODB: CONECTAT")).catch(err => console.log("❌ EROARE DB:", err));
 
-// Configurare Bot
-const bot = new Telegraf('7282819876:AAHy16b0R43_M4wM6_jM1G45N3C1F1F');
+// 3. Configurare Bot (IA TOKENUL DIN RENDER)
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Schema simplă
+// 4. Schema Bază de Date
 const User = mongoose.model('User', {
   telegramId: Number,
   sntrPoints: { type: Number, default: 0 }
 });
 
+// 5. Comenzi
 bot.start(async (ctx) => {
   try {
     let user = await User.findOne({ telegramId: ctx.from.id });
@@ -30,14 +29,18 @@ bot.start(async (ctx) => {
       user = new User({ telegramId: ctx.from.id });
       await user.save();
     }
-    ctx.reply("🛡️ SENTINEL CORE ACTIV.\nFolosește /stats");
-  } catch (e) { console.log(e); }
+    ctx.reply("🛡️ SENTINEL CORE ACTIV.\nFolosește /stats pentru balanță.");
+  } catch (e) { console.log("Start Error:", e); }
 });
 
 bot.command('stats', async (ctx) => {
-  const user = await User.findOne({ telegramId: ctx.from.id });
-  ctx.reply(`💰 SNTR: ${user ? user.sntrPoints : 0}`);
+  try {
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    ctx.reply(`💰 SNTR: ${user ? user.sntrPoints : 0}`);
+  } catch (e) { console.log("Stats Error:", e); }
 });
 
-bot.launch({ dropPendingUpdates: true });
-console.log("BOT_READY");
+// 6. Lansare cu Protecție
+bot.launch({ dropPendingUpdates: true })
+  .then(() => console.log("🚀 SENTINEL ESTE LIVE ȘI AUTORIZAT!"))
+  .catch(err => console.log("❌ EROARE AUTORIZARE (Token-ul de pe Render e prost):", err));
