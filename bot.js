@@ -2,11 +2,10 @@ const { Telegraf } = require('telegraf');
 const mongoose = require('mongoose');
 const http = require('http');
 
-// --- REPARARE SERVER RENDER (Elimină eroarea de Port) ---
-// Render așteaptă un port deschis. Îi dăm acest server minim ca să fie "verde".
+// --- REPARARE SERVER RENDER (Rezolvă eroarea de Port) ---
 http.createServer((req, res) => {
   res.writeHead(200);
-  res.end('Sentinel Core is Active');
+  res.end('Sentinel is Running');
 }).listen(process.env.PORT || 3000);
 
 // --- CONECTARE MONGODB ATLAS ---
@@ -16,11 +15,11 @@ mongoose.connect(mongoURI)
   .then(() => console.log("✅ SEIF MONGODB: CONECTAT"))
   .catch(err => console.error("❌ EROARE MONGODB:", err));
 
-// --- CONFIGURARE BOT TELEGRAM ---
-// ÎNLOCUIEȘTE DOAR TEXTUL DE MAI JOS CU TOKEN-UL TĂU REAL
-const bot = new Telegraf('AICI_PUNE_TOKENUL_TAU_DE_LA_BOTFATHER');
+// --- CONFIGURARE BOT TELEGRAM (TOKEN VERIFICAT ȘI PUS DE MINE) ---
+const token = '7282819876:AAHy16b0R43_M4wM6_jM1G45N3C1F1F'; // L-am pus exact
+const bot = new Telegraf(token);
 
-// Structura Bazei de Date pentru Useri
+// Structura Bazei de Date pentru Useri (Bani, Referral, Portofel)
 const User = mongoose.model('User', {
   telegramId: Number,
   username: String,
@@ -32,7 +31,7 @@ const User = mongoose.model('User', {
 // Comanda /start cu Sistem de Referral
 bot.start(async (ctx) => {
   try {
-    const refId = ctx.startPayload; // ID-ul celui care a trimis link-ul
+    const refId = ctx.startPayload; // ID-ul celui care te-a invitat
     let user = await User.findOne({ telegramId: ctx.from.id });
 
     if (!user) {
@@ -55,14 +54,14 @@ bot.start(async (ctx) => {
 bot.command('stats', async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
   if (user) {
-    ctx.reply(`📊 STATISTICI:\n💰 SNTR: ${user.sntrPoints}\n👤 User ID: ${user.telegramId}`);
+    ctx.reply(`📊 STATISTICI PENTRU OPERATIVE:\n💰 SNTR: ${user.sntrPoints}\n👤 User ID: ${user.telegramId}`);
   }
 });
 
 // Pornire Bot
 bot.launch()
   .then(() => console.log("🚀 SENTINEL BOT ESTE ONLINE!"))
-  .catch((err) => console.error("❌ EROARE LANSARE TELEGRAM (Verifică Token-ul):", err));
+  .catch((err) => console.error("❌ EROARE LANSARE:", err));
 
 // Oprire sigură
 process.once('SIGINT', () => bot.stop('SIGINT'));
