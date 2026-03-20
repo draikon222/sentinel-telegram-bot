@@ -17,14 +17,17 @@ const User = mongoose.model('User', {
   sntrPoints: { type: Number, default: 0 },
   wallet: { type: String, default: 'Nespecificat' },
   referredBy: Number,
-  referralCount: { type: Number, default: 0 }
+  referralCount: { type: Number, default: 0 },
+  lastDaily: { type: Date, default: new Date(0) } // Data pentru bonus zilnic
 });
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
+// MENIU NOU CU DAILY REWARD
 const mainMenu = Markup.keyboard([
-  ['💰 Balanță', '🔗 Invită Prieteni'],
-  ['💳 Setează Portofel', 'ℹ️ Ajutor']
+  ['💰 Balanță', '🎁 Daily Reward'],
+  ['🔗 Invită Prieteni', '💳 Setează Portofel'],
+  ['ℹ️ Ajutor']
 ]).resize();
 
 bot.start(async (ctx) => {
@@ -41,18 +44,38 @@ bot.start(async (ctx) => {
           referrer.sntrPoints += 50;
           referrer.referralCount += 1;
           await referrer.save();
-          bot.telegram.sendMessage(payload, `🎊 Cineva s-a alăturat prin link-ul tău! Ai primit 50 SNTR.`);
+          bot.telegram.sendMessage(payload, `🎊 Cineva s-a alăturat! Ai primit 50 SNTR.`);
         }
       }
       await user.save();
     }
-    ctx.reply("🛡️ BINE AI VENIT ÎN SENTINEL CORE.", mainMenu);
+    ctx.reply("🛡️ SENTINEL CORE ACTIV.", mainMenu);
   } catch (e) { console.error(e); }
 });
 
 bot.hears('💰 Balanță', async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
   ctx.reply(`📊 STATUS CONT:\n\n💰 SNTR: ${user ? user.sntrPoints : 0}\n👥 Invitați: ${user ? user.referralCount : 0}\n💳 Portofel: ${user?.wallet || 'Nespecificat'}`);
+});
+
+// LOGICA PENTRU BONUS ZILNIC
+bot.hears('🎁 Daily Reward', async (ctx) => {
+  const userId = ctx.from.id;
+  const user = await User.findOne({ telegramId: userId });
+  
+  const now = new Date();
+  const diff = now - user.lastDaily;
+  const hoursLeft = 24 - Math.floor(diff / (1000 * 60 * 60));
+
+  if (diff < 24 * 60 * 60 * 1000) {
+    return ctx.reply(`⏳ Ai răbdare! Poți cere următorul bonus peste ${hoursLeft} ore.`);
+  }
+
+  user.sntrPoints += 20; // Bonusul zilnic
+  user.lastDaily = now;
+  await user.save();
+  
+  ctx.reply("✅ Ai primit 20 SNTR! Revino mâine pentru mai mult.");
 });
 
 bot.hears('🔗 Invită Prieteni', (ctx) => {
@@ -64,10 +87,8 @@ bot.hears('💳 Setează Portofel', (ctx) => {
   ctx.reply("Trimite comanda: `/setwallet ADRESA_TA`", { parse_mode: 'Markdown' });
 });
 
-// HANDLER ACTUALIZAT - Mai permisiv
 bot.on('text', async (ctx) => {
   const msg = ctx.message.text;
-  
   if (msg.toLowerCase().startsWith('/setwallet')) {
     const parts = msg.split(' ');
     if (parts.length > 1) {
@@ -79,7 +100,6 @@ bot.on('text', async (ctx) => {
     }
     return ctx.reply("❌ Te rog trimite: `/setwallet AdresaTa`", { parse_mode: 'Markdown' });
   }
-
   if (msg === 'ℹ️ Ajutor') {
     return ctx.reply("🛡️ Sentinel Core\n/start - Meniu\n/setwallet [adresă] - Salvare portofel");
   }
