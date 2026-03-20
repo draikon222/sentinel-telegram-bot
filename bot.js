@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const { Connection, clusterApiUrl } = require('@solana/web3.js');
 const http = require('http');
 
-// 1. FORȚĂM SERVERUL SĂ RĂSPUNDĂ LUI RENDER
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
   res.writeHead(200);
@@ -12,10 +11,8 @@ http.createServer((req, res) => {
   console.log(`✅ SERVER ACTIV PE PORTUL ${PORT}`);
 });
 
-// 2. CONEXIUNE BLOCKCHAIN
 const solanaConn = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
 
-// 3. CONEXIUNE BAZĂ DE DATE
 mongoose.connect(process.env.MONGO_URI || "mongodb+srv://draikon:Gioniluca1980@cluster0.zc3ggbq.mongodb.net/?appName=Cluster0")
   .then(() => console.log("✅ DB CONECTAT"))
   .catch(err => console.error("❌ EROARE DB:", err));
@@ -39,7 +36,6 @@ const mainMenu = Markup.keyboard([
   ['🏆 Top 10', '💳 Setează Portofel']
 ]).resize();
 
-// 4. LOGICA DE VERIFICARE
 async function verifyTransaction(signature) {
   try {
     const tx = await solanaConn.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
@@ -51,7 +47,6 @@ async function verifyTransaction(signature) {
   } catch (e) { return false; }
 }
 
-// 5. COMENZI BOT
 bot.start(async (ctx) => {
   let user = await User.findOne({ telegramId: ctx.from.id });
   if (!user) {
@@ -60,6 +55,8 @@ bot.start(async (ctx) => {
   }
   ctx.reply("🛡️ SENTINEL CORE ACTIV.", mainMenu);
 });
+
+// --- REPARAREA BUTOANELOR ---
 
 bot.hears('💰 Balanță', async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
@@ -76,22 +73,47 @@ bot.hears('🎁 Daily Reward', async (ctx) => {
   ctx.reply("✅ Ai primit 20 SNTR!");
 });
 
+bot.hears('🔗 Invită Prieteni', (ctx) => {
+  ctx.reply(`🚀 Link: https://t.me/SentinelCoreV1_bot?start=${ctx.from.id}`);
+});
+
 bot.hears('💸 Trimite/Plătește SOL', (ctx) => {
   ctx.reply(`💸 Trimite SOL la:\n\`${ADMIN_WALLET}\`\n\nVerifică cu: \`/verify ID\``, { parse_mode: 'Markdown' });
+});
+
+// REPARAT: Handler pentru Top 10
+bot.hears('🏆 Top 10', async (ctx) => {
+  const topUsers = await User.find().sort({ sntrPoints: -1 }).limit(10);
+  let msg = "🏆 **TOP 10 UTILIZATORI**\n\n";
+  topUsers.forEach((u, i) => {
+    msg += `${i + 1}. @${u.username || 'Anonim'} - ${u.sntrPoints} SNTR\n`;
+  });
+  ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// REPARAT: Handler pentru Setează Portofel
+bot.hears('💳 Setează Portofel', (ctx) => {
+  ctx.reply("💳 Trimite comanda sub forma:\n`/setwallet ADRESA_TA_SOLANA`", { parse_mode: 'Markdown' });
 });
 
 bot.on('text', async (ctx) => {
   const msg = ctx.message.text;
   if (msg.startsWith('/verify')) {
     const sig = msg.split(' ')[1];
-    if (!sig) return ctx.reply("❌ Pune ID-ul tranzacției!");
+    if (!sig) return ctx.reply("❌ Pune ID-ul!");
     ctx.reply("🔍 Verificăm...");
     const ok = await verifyTransaction(sig);
     if (ok) {
       await User.findOneAndUpdate({ telegramId: ctx.from.id }, { $inc: { sntrPoints: 500 } });
-      ctx.reply("✅ CONFIRMAT! +500 SNTR");
-    } else {
-      ctx.reply("❌ Tranzacție invalidă.");
+      ctx.reply("✅ Confirmat! +500 SNTR");
+    } else { ctx.reply("❌ Invalid."); }
+  }
+  
+  if (msg.startsWith('/setwallet')) {
+    const addr = msg.split(' ')[1];
+    if (addr) {
+      await User.findOneAndUpdate({ telegramId: ctx.from.id }, { wallet: addr });
+      ctx.reply("✅ Portofel salvat!");
     }
   }
 });
