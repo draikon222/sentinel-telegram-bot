@@ -3,21 +3,23 @@ const mongoose = require('mongoose');
 const { Connection, clusterApiUrl } = require('@solana/web3.js');
 const http = require('http');
 
-// Menținem serverul activ pentru Render
+// 1. FORȚĂM SERVERUL SĂ RĂSPUNDĂ LUI RENDER
+const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
   res.writeHead(200);
-  res.end('Sentinel Core Ultimate System Online');
-}).listen(process.env.PORT || 3000);
+  res.end('Sentinel Core is Alive');
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ SERVER ACTIV PE PORTUL ${PORT}`);
+});
 
-// Conexiune Blockchain Solana (Mainnet)
+// 2. CONEXIUNE BLOCKCHAIN
 const solanaConn = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
 
-// Conectare Bază de Date MongoDB
+// 3. CONEXIUNE BAZĂ DE DATE
 mongoose.connect(process.env.MONGO_URI || "mongodb+srv://draikon:Gioniluca1980@cluster0.zc3ggbq.mongodb.net/?appName=Cluster0")
-  .then(() => console.log("✅ DB CONECTAT - SENTINEL ONLINE"))
+  .then(() => console.log("✅ DB CONECTAT"))
   .catch(err => console.error("❌ EROARE DB:", err));
 
-// Schema Utilizator
 const User = mongoose.model('User', {
   telegramId: Number,
   username: String,
@@ -29,136 +31,69 @@ const User = mongoose.model('User', {
 });
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-
-// PORTOFELUL TĂU UNDE VIN BANII REALI
 const ADMIN_WALLET = "J5MxnGsFa79EeQS6kAMcGLTK3kXXvC39TjEhj7BkD6bk"; 
 
-// Meniu Principal Complet
 const mainMenu = Markup.keyboard([
   ['💰 Balanță', '🎁 Daily Reward'],
   ['🔗 Invită Prieteni', '💸 Trimite/Plătește SOL'],
   ['🏆 Top 10', '💳 Setează Portofel']
 ]).resize();
 
-// --- FUNCȚIA DE VERIFICARE AUTOMATĂ PE BLOCKCHAIN ---
+// 4. LOGICA DE VERIFICARE
 async function verifyTransaction(signature) {
   try {
-    const tx = await solanaConn.getTransaction(signature, { 
-        commitment: 'confirmed', 
-        maxSupportedTransactionVersion: 0 
-    });
+    const tx = await solanaConn.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
     if (!tx) return false;
-    
-    // Extragem toate adresele implicate în tranzacție
     const accountKeys = tx.transaction.message.staticAccountKeys ? 
                         tx.transaction.message.staticAccountKeys.map(k => k.toString()) :
                         tx.transaction.message.accountKeys.map(k => k.toString());
-    
-    // Verificăm dacă adresa TA (Admin) a primit fonduri
     return accountKeys.includes(ADMIN_WALLET);
-  } catch (e) {
-    console.error("Eroare verificare Solana:", e);
-    return false;
-  }
+  } catch (e) { return false; }
 }
 
-// Comanda START cu sistem de Referral
+// 5. COMENZI BOT
 bot.start(async (ctx) => {
-  const payload = ctx.startPayload; 
-  const userId = ctx.from.id;
-  let user = await User.findOne({ telegramId: userId });
-  
+  let user = await User.findOne({ telegramId: ctx.from.id });
   if (!user) {
-    user = new User({ telegramId: userId, username: ctx.from.username || 'Anonim' });
-    if (payload && payload != userId) {
-      const referrer = await User.findOne({ telegramId: payload });
-      if (referrer) {
-        referrer.sntrPoints += 50;
-        referrer.referralCount += 1;
-        await referrer.save();
-        bot.telegram.sendMessage(payload, `🎊 Cineva s-a alăturat prin link-ul tău! Ai primit 50 SNTR.`);
-      }
-    }
+    user = new User({ telegramId: ctx.from.id, username: ctx.from.username || 'Anonim' });
     await user.save();
   }
-  ctx.reply("🛡️ SENTINEL CORE ACTIV. BANI REALI, RECOMPENSE AUTOMATE.", mainMenu);
+  ctx.reply("🛡️ SENTINEL CORE ACTIV.", mainMenu);
 });
 
-// Afișare Balanță
 bot.hears('💰 Balanță', async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
-  ctx.reply(`📊 STATUS CONT:\n\n💰 SNTR: ${user?.sntrPoints || 0}\n👥 Invitați: ${user?.referralCount || 0}\n💳 Portofel: ${user?.wallet || 'Nespecificat'}`);
+  ctx.reply(`📊 STATUS:\n💰 SNTR: ${user?.sntrPoints || 0}\n💳 Portofel: ${user?.wallet || 'Nespecificat'}`);
 });
 
-// Clasament Top 10
-bot.hears('🏆 Top 10', async (ctx) => {
-  const topUsers = await User.find().sort({ sntrPoints: -1 }).limit(10);
-  let leaderMsg = "🏆 **TOP 10 SENTINEL CORE**\n\n";
-  topUsers.forEach((u, i) => {
-    leaderMsg += `${i + 1}. @${u.username || 'Anonim'} - ${u.sntrPoints} SNTR\n`;
-  });
-  ctx.reply(leaderMsg, { parse_mode: 'Markdown' });
-});
-
-// Recompensă Zilnică (Momeala)
 bot.hears('🎁 Daily Reward', async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
   const now = new Date();
-  if (now - user.lastDaily < 24 * 60 * 60 * 1000) {
-    return ctx.reply("⏳ Revino mâine pentru bonusul tău!");
-  }
+  if (now - user.lastDaily < 86400000) return ctx.reply("⏳ Revino mâine!");
   user.sntrPoints += 20;
   user.lastDaily = now;
   await user.save();
-  ctx.reply("✅ Ai primit 20 SNTR bonus zilnic!");
+  ctx.reply("✅ Ai primit 20 SNTR!");
 });
 
-// Link Invită Prieteni
-bot.hears('🔗 Invită Prieteni', (ctx) => {
-  ctx.reply(`🚀 Invită-ți prietenii și primește 50 SNTR cadou!\n\n🔗 Link-ul tău:\nhttps://t.me/SentinelCoreV1_bot?start=${ctx.from.id}`);
-});
-
-// Secțiunea de BANI REALI (Comision 1%)
 bot.hears('💸 Trimite/Plătește SOL', (ctx) => {
-  ctx.reply(`💸 **SENTINEL PAY (1% Fee)**\n\nTrimite suma dorită + 1% comision la adresa noastră:\n\`${ADMIN_WALLET}\`\n\nDupă plată, scrie:\n\`/verify [SIGNATURE_TRANZACTIE]\` ca să primești **500 SNTR** automat în balanță!`, { parse_mode: 'Markdown' });
+  ctx.reply(`💸 Trimite SOL la:\n\`${ADMIN_WALLET}\`\n\nVerifică cu: \`/verify ID\``, { parse_mode: 'Markdown' });
 });
 
-// Logica pentru comenzi text (/verify și /setwallet)
 bot.on('text', async (ctx) => {
   const msg = ctx.message.text;
-
-  // Verificare Automată Tranzacție
   if (msg.startsWith('/verify')) {
-    const signature = msg.split(' ')[1];
-    if (!signature) return ctx.reply("❌ Te rog pune Signature-ul (ID-ul tranzacției) după comandă.");
-
-    let user = await User.findOne({ telegramId: ctx.from.id });
-    if (user.usedSignatures.includes(signature)) return ctx.reply("❌ Această tranzacție a fost deja folosită!");
-
-    ctx.reply("🔍 Verificăm pe blockchain-ul Solana... Așteaptă.");
-    
-    const isValid = await verifyTransaction(signature);
-    
-    if (isValid) {
-      user.sntrPoints += 500;
-      user.usedSignatures.push(signature);
-      await user.save();
-      ctx.reply("✅ CONFIRMAT! Ai primit 500 SNTR. Comisionul de 1% a fost procesat și înregistrat.");
+    const sig = msg.split(' ')[1];
+    if (!sig) return ctx.reply("❌ Pune ID-ul tranzacției!");
+    ctx.reply("🔍 Verificăm...");
+    const ok = await verifyTransaction(sig);
+    if (ok) {
+      await User.findOneAndUpdate({ telegramId: ctx.from.id }, { $inc: { sntrPoints: 500 } });
+      ctx.reply("✅ CONFIRMAT! +500 SNTR");
     } else {
-      ctx.reply("❌ Tranzacție negăsită sau nu a fost trimisă la adresa Sentinel Core. Verifică ID-ul!");
-    }
-  }
-
-  // Setare Portofel Utilizator
-  if (msg.startsWith('/setwallet')) {
-    const address = msg.split(' ')[1];
-    if (address && address.length > 20) {
-      await User.findOneAndUpdate({ telegramId: ctx.from.id }, { wallet: address });
-      ctx.reply(`✅ Portofel salvat:\n${address}`);
-    } else {
-      ctx.reply("❌ Adresă invalidă!");
+      ctx.reply("❌ Tranzacție invalidă.");
     }
   }
 });
 
-bot.launch({ dropPendingUpdates: true });
+bot.launch();
