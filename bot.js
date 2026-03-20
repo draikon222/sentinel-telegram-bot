@@ -1,37 +1,113 @@
-// ... (păstrează restul codului de sus până la mainMenu)
+const { Telegraf, Markup } = require('telegraf');
+const mongoose = require('mongoose');
+const http = require('http');
 
+// Server pentru Render să nu se închidă
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Sentinel Core System Online');
+}).listen(process.env.PORT || 3000);
+
+// Conectare la Seiful MongoDB
+mongoose.connect(process.env.MONGO_URI || "mongodb+srv://draikon:Gioniluca1980@cluster0.zc3ggbq.mongodb.net/?appName=Cluster0")
+  .then(() => console.log("✅ SEIF MONGODB: CONECTAT"))
+  .catch(err => console.error("❌ EROARE DB:", err));
+
+const User = mongoose.model('User', {
+  telegramId: Number,
+  username: String,
+  sntrPoints: { type: Number, default: 0 },
+  wallet: { type: String, default: 'Nespecificat' },
+  referredBy: Number,
+  referralCount: { type: Number, default: 0 },
+  lastDaily: { type: Date, default: new Date(0) }
+});
+
+const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// ADRESA TA PENTRU COMISIOANE
+const ADMIN_WALLET = "J5MxnGsFa79EeQS6kAMcGLTK3kXXvC39TjEhj7BkD6bk"; 
+
+// MENIUL COMPLET
 const mainMenu = Markup.keyboard([
   ['💰 Balanță', '🎁 Daily Reward'],
-  ['🔗 Invită Prieteni', '💸 Trimite/Plătește SOL'], // Buton nou pentru bani reali
+  ['🔗 Invită Prieteni', '💸 Trimite/Plătește SOL'],
   ['💳 Setează Portofel', 'ℹ️ Ajutor']
 ]).resize();
 
-// ADRESA TA UNDE VIN COMISIOANELE (SCHIMB-O CU A TA!)
-const ADMIN_WALLET = "J5MxnGsFa79EeQS6kAMcGLTK3kXXvC39TjEhj7BkD6bk"; 
+bot.start(async (ctx) => {
+  const payload = ctx.startPayload; 
+  const userId = ctx.from.id;
+  try {
+    let user = await User.findOne({ telegramId: userId });
+    if (!user) {
+      user = new User({ telegramId: userId, username: ctx.from.username || 'Anonim' });
+      if (payload && payload != userId) {
+        const referrer = await User.findOne({ telegramId: payload });
+        if (referrer) {
+          user.referredBy = payload;
+          referrer.sntrPoints += 50;
+          referrer.referralCount += 1;
+          await referrer.save();
+          bot.telegram.sendMessage(payload, `🎊 Cineva s-a alăturat! Ai primit 50 SNTR.`);
+        }
+      }
+      await user.save();
+    }
+    ctx.reply("🛡️ SENTINEL CORE ACTIV. BANI REALI, RECOMPENSE REALE.", mainMenu);
+  } catch (e) { console.error(e); }
+});
+
+bot.hears('💰 Balanță', async (ctx) => {
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  ctx.reply(`📊 STATUS CONT:\n\n💰 SNTR: ${user ? user.sntrPoints : 0}\n👥 Invitați: ${user ? user.referralCount : 0}\n💳 Portofel: ${user?.wallet || 'Nespecificat'}`);
+});
+
+bot.hears('🎁 Daily Reward', async (ctx) => {
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const now = new Date();
+  const diff = now - user.lastDaily;
+  if (diff < 24 * 60 * 60 * 1000) {
+    const hoursLeft = 24 - Math.floor(diff / (1000 * 60 * 60));
+    return ctx.reply(`⏳ Mai ai de așteptat ${hoursLeft} ore.`);
+  }
+  user.sntrPoints += 20;
+  user.lastDaily = now;
+  await user.save();
+  ctx.reply("✅ Ai primit 20 SNTR bonus zilnic!");
+});
+
+bot.hears('🔗 Invită Prieteni', (ctx) => {
+  ctx.reply(`🚀 Invită prieteni și ia 50 SNTR!\n\n🔗 Link:\nhttps://t.me/SentinelCoreV1_bot?start=${ctx.from.id}`);
+});
 
 bot.hears('💸 Trimite/Plătește SOL', (ctx) => {
-  ctx.reply(`💸 **SENTINEL PAY (1% Fee)**\n\nFolosește acest serviciu pentru a trimite SOL către orice adresă cu un comision de doar 1%.\n\n🎁 **BONUS:** Primești **500 SNTR** pentru fiecare tranzacție procesată!\n\n**Cum funcționează?**\nTrimite comanda: \`/pay [adresa_destinatar] [suma_sol]\` \nExemplu: \`/pay 7xW... 0.5\``, { parse_mode: 'Markdown' });
+  ctx.reply(`💸 **SENTINEL PAY (1% Fee)**\n\nTrimite SOL oriunde cu comision de 1%.\n🎁 **BONUS:** 500 SNTR cadou la fiecare plată!\n\nComandă: \`/pay [adresă] [sumă]\``, { parse_mode: 'Markdown' });
 });
 
 bot.on('text', async (ctx) => {
   const msg = ctx.message.text;
 
-  // LOGICA PENTRU CALCUL PLĂȚI ȘI COMISION
   if (msg.toLowerCase().startsWith('/pay')) {
     const parts = msg.split(' ');
-    if (parts.length < 3) return ctx.reply("❌ Format greșit! Folosește: `/pay ADRESA SUMA`", { parse_mode: 'Markdown' });
-
+    if (parts.length < 3) return ctx.reply("❌ Format: `/pay Adresă Sumă`", { parse_mode: 'Markdown' });
     const dest = parts[1];
     const amount = parseFloat(parts[2]);
     if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Sumă invalidă!");
-
-    const fee = amount * 0.01; // CALCUL COMISION 1%
+    
+    const fee = amount * 0.01;
     const total = amount + fee;
 
-    return ctx.reply(`📊 **DETALII TRANZACȚIE**\n\n🔹 Destinatar: \`${dest}\` \n🔹 Sumă: \`${amount} SOL\` \n🔹 Comision Sentinel (1%): \`${fee.toFixed(4)} SOL\` \n\n⚠️ **TOTAL DE PLATĂ:** \`${total.toFixed(4)} SOL\` \n\nPentru a finaliza, trimite suma totală la adresa noastră de escrow:\n\`${ADMIN_WALLET}\` \n\nDupă plată, trimite ID-ul tranzacției (Signature) pentru confirmare și primirea bonusului de 500 SNTR!`, { parse_mode: 'Markdown' });
+    return ctx.reply(`📊 **NOTĂ DE PLATĂ**\n\n🔹 Destinatar: \`${dest}\`\n🔹 Sumă: \`${amount} SOL\`\n🔹 Comision (1%): \`${fee.toFixed(4)} SOL\`\n\n⚠️ **DE TRIMIS:** \`${total.toFixed(4)} SOL\`\n\nTrimite la adresa Sentinel:\n\`${ADMIN_WALLET}\`\n\nDupă plată, trimite Signature pentru bonusul de 500 SNTR!`, { parse_mode: 'Markdown' });
   }
 
-  // ... (restul de handlere pentru /setwallet, Daily Reward, etc. rămân neschimbate)
+  if (msg.toLowerCase().startsWith('/setwallet')) {
+    const address = msg.split(' ')[1];
+    if (address && address.length > 20) {
+      await User.findOneAndUpdate({ telegramId: ctx.from.id }, { wallet: address });
+      ctx.reply(`✅ Portofel salvat:\n${address}`);
+    }
+  }
 });
 
-// ... (bot.launch)
+bot.launch({ dropPendingUpdates: true });
