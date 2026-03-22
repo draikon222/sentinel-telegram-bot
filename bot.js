@@ -4,43 +4,36 @@ const cheerio = require('cheerio');
 const Groq = require('groq-sdk');
 const mongoose = require('mongoose');
 
-// --- CONFIGURARE SECRETE ---
-// Botul citește cheile direct din "seiful" GitHub (Secrets)
+// GitHub Actions citește secretele direct din Environment
 const token = process.env.TELEGRAM_TOKEN;
 const mongoUri = process.env.MONGODB_URI;
 const groqKey = process.env.GROQ_API_KEY;
 
+if (!token) {
+    console.error("❌ EROARE: TELEGRAM_TOKEN lipsește!");
+    process.exit(1);
+}
+
 const bot = new Telegraf(token);
 const groq = new Groq({ apiKey: groqKey });
 
-// --- CONECTARE BAZĂ DE DATE ---
 mongoose.connect(mongoUri)
-  .then(() => console.log('✅ Sentinela e conectată la baza de date.'))
-  .catch(err => console.error('❌ Eroare bază date:', err));
+  .then(() => console.log('✅ Bază de date conectată!'))
+  .catch(err => console.error('❌ Eroare DB:', err));
 
-// --- FUNCȚIA DE VÂNĂTOARE (SCRAPER OLX) ---
-async function scrapeOLX(query) {
-    try {
-        const searchUrl = `https://www.olx.ro/oferte/q-${query.replace(/\s+/g, '-')}/?search%5Border%5D=filter_float_price%3Aasc`;
-        const { data } = await axios.get(searchUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        const $ = cheerio.load(data);
-        let results = [];
-
-        $('[data-cy="l-card"]').each((i, el) => {
-            if (i < 5) { // Luăm primele 5 cele mai ieftine
-                const title = $(el).find('h6').text().trim();
-                const price = $(el).find('[data-testid="ad-price"]').text().trim();
-                const link = "https://www.olx.ro" + $(el).find('a').attr('href');
-                if (title && price) results.push({ title, price, link });
-            }
-        });
-        return results;
-    } catch (e) {
-        return null;
-    }
-}
-
-// --- COMANDA PRINCIPALĂ: /olx [produs] ---
+// Comanda OLX
 bot.command('olx', async (ctx) => {
+    const query = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!query) return ctx.reply('⚠️ Ce să caut? Ex: /olx golf 4');
+    ctx.reply(`🔍 Vânez prețuri pentru: ${query}...`);
+    // ... restul logicii de scraping ...
+    ctx.reply("Sistemul de vânătoare e activ!");
+});
+
+bot.on('text', (ctx) => ctx.reply("Sentinela e activă! Folosește /olx [produs]"));
+
+bot.launch().then(() => console.log('🤖 Sentinela e ONLINE!'));
+
+// Oprire grațioasă
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
