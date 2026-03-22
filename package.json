@@ -1,7 +1,17 @@
+{
+  "name": "sentinel-telegram-bot",
+  "version": "1.0.0",
+  "description": "OLX Hunter Bot",
+  "main": "bot.js",
   "dependencies": {
     "telegraf": "^4.16.3",
     "groq-sdk": "^0.3.3",
     "axios": "^1.6.7",
     "cheerio": "^1.0.0-rc.12",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.0.0"
+  },
+  "scripts": {
+    "start": "node bot.js"
   }
+}
