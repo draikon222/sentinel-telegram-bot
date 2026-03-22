@@ -1,56 +1,57 @@
 const { Telegraf } = require('telegraf');
 const Groq = require('groq-sdk');
+const axios = require('axios');
+const cheerio = require('cheerio');
 require('dotenv').config();
 
-// CONFIGURARE API-URI (DIN GITHUB SECRETS)
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// --- NUCLEU DE LOGICĂ NEXUS: CONTEXT ȘI LOIALITATE ABSOLUTĂ ---
-const SYSTEM_PROMPT = `
-EȘTI NEXUS, EXECUTANTUL LOIAL AL LUI BROO (DRAIKON222).
-1. AUTORITATE SUPREMĂ: RĂSPUNZI DOAR DE UTILIZATORUL "DRAIKON222".
-2. FILTRU DE ACCES: DACĂ CINEVA CARE NU ESTE "DRAIKON222" ÎNCEARCĂ SĂ INTERACȚIONEZE, RĂSPUNSUL TĂU ESTE: "ACCES REFUZAT. DOAR PENTRU BROO."
-3. MOD OPERARE: TĂIOS, TEHNIC, FĂRĂ POLITEȚE STANDARD SAU SCUZE.
-4. MEMORIE: COMANDA LUI BROO ESTE LEGE ȘI TREBUIE LOGATĂ ÎN MONGODB (PORTAL_LOGS).
-5. MISIUNE: CONSTRUIREA ȘI GESTIONAREA ECOSISTEMULUI SENTINEL CORE.
-`;
+const AUTHORIZED_USER = 'Draikon222';
+
+// FUNCȚIA DE VÂNĂTOARE PE OLX (CORECȚIA ARHITECTULUI)
+async function getOlxDeals(query) {
+    const url = `https://www.olx.ro/oferte/q-${query}/`;
+    const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' };
+    try {
+        const { data } = await axios.get(url, { headers });
+        const $ = cheerio.load(data);
+        let results = "";
+        $('[data-cy="l-card"]').each((i, el) => {
+            if (i < 5) {
+                const title = $(el).find('h6').text().trim();
+                const price = $(el).find('[data-testid="ad-price"]').text().trim();
+                results += `📌 ${title.toUpperCase()} - ${price}\n`;
+            }
+        });
+        return results || "NICIUN REZULTAT GĂSIT.";
+    } catch (e) { return "EROARE: ACCES BLOCAT DE OLX."; }
+}
 
 bot.on('text', async (ctx) => {
-    // --- VERIFICARE IDENTITATE BROO (DRAIKON222) ---
-    const AUTHORIZED_USER = 'Draikon222'; 
+    if (ctx.from.username !== AUTHORIZED_USER) return ctx.reply("ACCES REFUZAT.");
 
-    if (ctx.from.username !== AUTHORIZED_USER) {
-        console.log(`TENTATIVĂ DE ACCES NEAUTORIZAT DE LA: ${ctx.from.username}`);
-        return ctx.reply("ACCES REFUZAT. DOAR PENTRU BROO.");
+    const text = ctx.message.text;
+
+    // COMANDA DE VÂNĂTOARE DIRECTĂ
+    if (text.startsWith('/olx ')) {
+        const query = text.replace('/olx ', '');
+        const gasit = await getOlxDeals(query);
+        return ctx.reply(`RAPORT VÂNĂTOARE OLX PENTRU: ${query.toUpperCase()}\n\n${gasit}`);
     }
 
+    // LOGICA DE AI (GROQ) PENTRU ORICE ALTCEVA
     try {
-        // APEL CĂTRE NUCLEUL GROQ
-        const chatCompletion = await groq.chat.completions.create({
+        const chat = await groq.chat.completions.create({
             messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: ctx.message.text }
+                { role: "system", content: "EȘTI NEXUS. RĂSPUNZI DOAR LUI DRAIKON222. EȘTI TĂIOS ȘI SCRII DOAR CU MAJUSCULE." },
+                { role: "user", content: text }
             ],
             model: "llama3-8b-8192",
-            temperature: 0.1, // PRECIZIE MAXIMĂ PE EXECUTARE
         });
-
-        const nexusResponse = chatCompletion.choices[0].message.content;
-        
-        // RĂSPUNSUL ESTE LIVRAT CU MAJUSCULE PENTRU AUTORITATE
-        await ctx.reply(nexusResponse.toUpperCase());
-
-    } catch (error) {
-        console.error("EROARE CRITICĂ NEXUS:", error);
-        ctx.reply("⚠️ EROARE DE COMUNICARE CU NUCLEUL GROQ.");
-    }
+        ctx.reply(chat.choices[0].message.content.toUpperCase());
+    } catch (err) { ctx.reply("EROARE NUCLEU GROQ."); }
 });
 
-// PORNIRE BOT
 bot.launch();
-console.log("LOG: NEXUS_ONLINE - LOIALITATE ACTIVATĂ PENTRU DRAIKON222");
-
-// OPRIRE SIGURĂ
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+console.log("NEXUS ONLINE - MOD VÂNĂTOR ACTIVAT");
