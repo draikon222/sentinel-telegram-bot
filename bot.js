@@ -6,10 +6,8 @@ require('dotenv').config();
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 const AUTHORIZED_USER = 'Draikon222';
 
-// FUNCȚIA DE VÂNĂTOARE PE OLX (CORECȚIA ARHITECTULUI)
 async function getOlxDeals(query) {
     const url = `https://www.olx.ro/oferte/q-${query}/`;
     const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' };
@@ -21,30 +19,31 @@ async function getOlxDeals(query) {
             if (i < 5) {
                 const title = $(el).find('h6').text().trim();
                 const price = $(el).find('[data-testid="ad-price"]').text().trim();
-                results += `📌 ${title.toUpperCase()} - ${price}\n`;
+                if (title) results += `📌 ${title.toUpperCase()} - ${price}\n`;
             }
         });
-        return results || "NICIUN REZULTAT GĂSIT.";
-    } catch (e) { return "EROARE: ACCES BLOCAT DE OLX."; }
+        return results || "NICIUN REZULTAT GĂSIT PE OLX.";
+    } catch (e) { return "EROARE CRITICĂ: ACCES BLOCAT DE OLX."; }
 }
 
 bot.on('text', async (ctx) => {
+    // DOAR TU ÎL POȚI CONTROLA
     if (ctx.from.username !== AUTHORIZED_USER) return ctx.reply("ACCES REFUZAT.");
 
     const text = ctx.message.text;
 
-    // COMANDA DE VÂNĂTOARE DIRECTĂ
+    // COMANDA DE CĂUTARE PE OLX
     if (text.startsWith('/olx ')) {
         const query = text.replace('/olx ', '');
         const gasit = await getOlxDeals(query);
-        return ctx.reply(`RAPORT VÂNĂTOARE OLX PENTRU: ${query.toUpperCase()}\n\n${gasit}`);
+        return ctx.reply(`RAPORT SENTINELA OLX: ${query.toUpperCase()}\n\n${gasit}`);
     }
 
-    // LOGICA DE AI (GROQ) PENTRU ORICE ALTCEVA
+    // LOGICA DE AI PENTRU DISCUȚII
     try {
         const chat = await groq.chat.completions.create({
             messages: [
-                { role: "system", content: "EȘTI NEXUS. RĂSPUNZI DOAR LUI DRAIKON222. EȘTI TĂIOS ȘI SCRII DOAR CU MAJUSCULE." },
+                { role: "system", content: "EȘTI SENTINELA LUI DRAIKON222. RĂSPUNZI TĂIOS, REALIST ȘI DOAR CU MAJUSCULE." },
                 { role: "user", content: text }
             ],
             model: "llama3-8b-8192",
@@ -54,4 +53,4 @@ bot.on('text', async (ctx) => {
 });
 
 bot.launch();
-console.log("NEXUS ONLINE - MOD VÂNĂTOR ACTIVAT");
+console.log("SENTINELA ONLINE - GATA DE VÂNĂTOARE");
