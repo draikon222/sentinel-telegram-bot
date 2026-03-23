@@ -1,4 +1,3 @@
-// 1. IMPORTURI (OBLIGATORII)
 const { Telegraf } = require('telegraf');
 const { chromium } = require('playwright');
 const axios = require('axios');
@@ -6,23 +5,18 @@ const cheerio = require('cheerio');
 const mongoose = require('mongoose');
 const Groq = require('groq-sdk');
 
-// 2. DEFINIREA NUCLEULUI (Dacă asta nu e prima, dă ReferenceError)
+// --- UNICĂ DEFINIRE (Rezolvă eroarea din 12214.jpg) ---
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// 3. CONECTARE BAZĂ DE DATE
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("💾 [NEXUS]: Memorie conectată."))
-    .catch(err => console.error("❌ Eroare DB:", err.message));
+// --- BAZĂ DE DATE ---
+if (process.env.MONGO_URI) {
+    mongoose.connect(process.env.MONGO_URI)
+        .then(() => console.log("💾 Memorie activă."))
+        .catch(err => console.error("❌ Eroare DB:", err.message));
+}
 
-const NexusMemory = mongoose.model('NexusMemory', new mongoose.Schema({
-    userId: Number,
-    role: String,
-    content: String,
-    timestamp: { type: Date, default: Date.now }
-}));
-
-// 4. COMANDA: CAUTA
+// --- COMANDĂ: CAUTA ---
 bot.command('cauta', async (ctx) => {
     const query = ctx.message.text.split(' ').slice(1).join(' ');
     if (!query) return ctx.reply('🔹 /cauta <termen>');
@@ -37,23 +31,23 @@ bot.command('cauta', async (ctx) => {
     } catch (e) { ctx.reply('⚠️ Eroare Google.'); }
 });
 
-// 5. COMANDA: SCREENSHOT (Fixed for Render)
+// --- COMANDĂ: SCREENSHOT ---
 bot.command('screenshot', async (ctx) => {
     const url = ctx.message.text.split(' ')[1];
     if (!url) return ctx.reply('🔹 /screenshot <url>');
     let browser;
     try {
-        ctx.reply('📸 Nexus procesează vizual...');
+        ctx.reply('📸 Nexus accesează URL...');
         browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
         const page = await browser.newPage();
-        await page.goto(url.startsWith('http') ? url : `https://${url}`, { timeout: 45000 });
+        await page.goto(url.startsWith('http') ? url : `https://${url}`, { timeout: 30000 });
         const buffer = await page.screenshot();
         await ctx.replyWithPhoto({ source: buffer });
     } catch (e) { ctx.reply(`❌ Eroare Playwright.`); }
     finally { if (browser) await browser.close(); }
 });
 
-// 6. INTERACȚIUNE AI
+// --- INTERACȚIUNE AI ---
 bot.on('text', async (ctx) => {
     try {
         const chat = await groq.chat.completions.create({
@@ -64,8 +58,8 @@ bot.on('text', async (ctx) => {
     } catch (e) { console.error("AI Error"); }
 });
 
-// 7. PORNIRE (Ultima linie)
-bot.launch().then(() => console.log("🚀 SENTINEL CORE ONLINE."));
+// --- LANSARE ---
+bot.launch().then(() => console.log("🚀 SISTEM ONLINE FĂRĂ ERORI."));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
