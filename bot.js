@@ -5,11 +5,11 @@ const cheerio = require('cheerio');
 const mongoose = require('mongoose');
 const Groq = require('groq-sdk');
 
-// 1. CONFIGURARE VARIABILE (Reference Safety)
+// 1. DEFINIREA NUCLEULUI (Aceasta trebuie să fie PRIMA ca să nu mai dea ReferenceError)
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// 2. CONECTARE BAZĂ DE DATE (Pentru Memorie)
+// 2. CONECTARE BAZĂ DE DATE
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("💾 [NEXUS]: Memorie MongoDB conectată."))
     .catch(err => console.error("❌ Eroare DB:", err.message));
@@ -22,7 +22,7 @@ const memorySchema = new mongoose.Schema({
 });
 const NexusMemory = mongoose.model('NexusMemory', memorySchema);
 
-// 3. MODUL: CAUTA (Google) [Ref: 12188.jpg]
+// 3. COMANDA: CAUTA (Google) [Ref: 12188.jpg]
 bot.command('cauta', async (ctx) => {
     const query = ctx.message.text.split(' ').slice(1).join(' ');
     if (!query) return ctx.reply('🔹 Folosește: /cauta <termen>');
@@ -37,24 +37,29 @@ bot.command('cauta', async (ctx) => {
     } catch (e) { ctx.reply('⚠️ Eroare la accesarea Google.'); }
 });
 
-// 4. MODUL: SCREENSHOT (Render-Ready) [Ref: 12194.jpg]
+// 4. COMANDA: SCREENSHOT (Render-Ready) [Ref: 12194.jpg]
 bot.command('screenshot', async (ctx) => {
     const url = ctx.message.text.split(' ')[1];
     if (!url) return ctx.reply('🔹 Folosește: /screenshot <url>');
     let browser;
     try {
         ctx.reply('📸 Nexus procesează vizual...');
-        browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+        browser = await chromium.launch({ 
+            args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+        });
         const page = await browser.newPage();
         const targetUrl = url.startsWith('http') ? url : `https://${url}`;
         await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 45000 });
         const buffer = await page.screenshot();
         await ctx.replyWithPhoto({ source: buffer });
-    } catch (e) { ctx.reply(`❌ Eroare vizuală: ${e.message.substring(0, 40)}`); }
-    finally { if (browser) await browser.close(); }
+    } catch (e) { 
+        ctx.reply(`❌ Eroare vizuală: Chromium nu e instalat corect pe Render.`); 
+    } finally { 
+        if (browser) await browser.close(); 
+    }
 });
 
-// 5. MODUL: WIKI [Ref: 12181.jpg]
+// 5. COMANDA: WIKI [Ref: 12181.jpg]
 bot.command('wiki', async (ctx) => {
     const query = ctx.message.text.split(' ').slice(1).join('_');
     try {
@@ -64,7 +69,7 @@ bot.command('wiki', async (ctx) => {
     } catch (e) { ctx.reply('❌ Subiectul nu a fost găsit.'); }
 });
 
-// 6. INTERACȚIUNE AI + MEMORIE (Nexus Core)
+// 6. INTERACȚIUNE AI + MEMORIE
 bot.on('text', async (ctx) => {
     try {
         const completion = await groq.chat.completions.create({
@@ -86,7 +91,7 @@ bot.on('text', async (ctx) => {
 });
 
 // 7. LANSARE
-bot.launch().then(() => console.log("🚀 SENTINEL CORE ONLINE. Toate sistemele funcționale."));
+bot.launch().then(() => console.log("🚀 SENTINEL CORE ONLINE."));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
