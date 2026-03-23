@@ -5,18 +5,18 @@ const cheerio = require('cheerio');
 const mongoose = require('mongoose');
 const Groq = require('groq-sdk');
 
-// --- UNICĂ DEFINIRE (Rezolvă eroarea din 12214.jpg) ---
+// 1. DEFINIRE UNICĂ (Dacă apare de 2 ori în fișier, dă eroare)
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// --- BAZĂ DE DATE ---
+// 2. CONECTARE DB
 if (process.env.MONGO_URI) {
     mongoose.connect(process.env.MONGO_URI)
-        .then(() => console.log("💾 Memorie activă."))
+        .then(() => console.log("💾 Bază de date OK."))
         .catch(err => console.error("❌ Eroare DB:", err.message));
 }
 
-// --- COMANDĂ: CAUTA ---
+// 3. COMANDA: CAUTA [Ref: 12188.jpg]
 bot.command('cauta', async (ctx) => {
     const query = ctx.message.text.split(' ').slice(1).join(' ');
     if (!query) return ctx.reply('🔹 /cauta <termen>');
@@ -31,13 +31,13 @@ bot.command('cauta', async (ctx) => {
     } catch (e) { ctx.reply('⚠️ Eroare Google.'); }
 });
 
-// --- COMANDĂ: SCREENSHOT ---
+// 4. COMANDA: SCREENSHOT [Ref: 12184.jpg]
 bot.command('screenshot', async (ctx) => {
     const url = ctx.message.text.split(' ')[1];
     if (!url) return ctx.reply('🔹 /screenshot <url>');
     let browser;
     try {
-        ctx.reply('📸 Nexus accesează URL...');
+        ctx.reply('📸 Nexus procesează...');
         browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
         const page = await browser.newPage();
         await page.goto(url.startsWith('http') ? url : `https://${url}`, { timeout: 30000 });
@@ -47,7 +47,7 @@ bot.command('screenshot', async (ctx) => {
     finally { if (browser) await browser.close(); }
 });
 
-// --- INTERACȚIUNE AI ---
+// 5. INTERACȚIUNE AI
 bot.on('text', async (ctx) => {
     try {
         const chat = await groq.chat.completions.create({
@@ -58,8 +58,8 @@ bot.on('text', async (ctx) => {
     } catch (e) { console.error("AI Error"); }
 });
 
-// --- LANSARE ---
-bot.launch().then(() => console.log("🚀 SISTEM ONLINE FĂRĂ ERORI."));
+// 6. LANSARE
+bot.launch().then(() => console.log("🚀 SISTEM ONLINE."));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
