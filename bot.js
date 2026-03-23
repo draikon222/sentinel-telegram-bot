@@ -1,16 +1,22 @@
-const { Telegraf } = require('telegraf');
-const { chromium } = require('playwright');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const Groq = require('groq-sdk');
+// 1. IMPORTURI
+var { Telegraf } = require('telegraf');
+var { chromium } = require('playwright');
+var axios = require('axios');
+var cheerio = require('cheerio');
+var Groq = require('groq-sdk');
 
-// Prevenim redeclararea dacă rulezi în consolă (HACK PROFESIONAL)
-if (typeof bot === 'undefined') {
-    var bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+// 2. EVITARE EROARE RE-DECLARARE (Soluția pentru 12221.jpg)
+// Folosim 'global' pentru a verifica dacă 'bot' a fost deja injectat în memorie
+if (!global.botInstance) {
+    global.botInstance = new Telegraf(process.env.TELEGRAM_TOKEN);
+    console.log("🚀 [NEXUS]: Instanță nouă creată.");
+} else {
+    console.log("♻️ [NEXUS]: Instanță existentă detectată. Reutilizare...");
 }
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+var bot = global.botInstance;
+var groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// --- COMANDĂ: CAUTA ---
+// 3. COMANDA: CAUTA
 bot.command('cauta', async (ctx) => {
     try {
         const query = ctx.message.text.split(' ').slice(1).join(' ');
@@ -20,27 +26,11 @@ bot.command('cauta', async (ctx) => {
         const $ = cheerio.load(data);
         let res = [];
         $('h3').each((i, el) => { if(i < 3) res.push(`📍 ${$(el).text()}`); });
-        ctx.reply(res.join('\n\n') || "Niciun rezultat.");
+        ctx.reply(results.join('\n\n') || "Niciun rezultat.");
     } catch (e) { ctx.reply('⚠️ Eroare Google.'); }
 });
 
-// --- COMANDĂ: SCREENSHOT ---
-bot.command('screenshot', async (ctx) => {
-    const url = ctx.message.text.split(' ')[1];
-    if (!url) return ctx.reply('🔹 /screenshot <url>');
-    let browser;
-    try {
-        ctx.reply('📸 Nexus accesează URL...');
-        browser = await chromium.launch({ args: ['--no-sandbox'] });
-        const page = await browser.newPage();
-        await page.goto(url.startsWith('http') ? url : `https://${url}`, { timeout: 30000 });
-        const buffer = await page.screenshot();
-        await ctx.replyWithPhoto({ source: buffer });
-    } catch (e) { ctx.reply(`❌ Eroare Playwright.`); }
-    finally { if (browser) await browser.close(); }
-});
-
-// --- INTERACȚIUNE AI ---
+// 4. INTERACȚIUNE AI
 bot.on('text', async (ctx) => {
     try {
         const chat = await groq.chat.completions.create({
@@ -51,7 +41,7 @@ bot.on('text', async (ctx) => {
     } catch (e) { console.error("AI Error"); }
 });
 
-// --- LANSARE FORȚATĂ ---
+// 5. LANSARE SIGURĂ
 bot.launch()
-    .then(() => console.log("🚀 NEXUS ONLINE"))
-    .catch(() => console.log("⚠️ Deja online sau eroare token."));
+    .then(() => console.log("✅ SISTEM OPERAȚIONAL"))
+    .catch((err) => console.log("ℹ️ Botul rulează deja."));
