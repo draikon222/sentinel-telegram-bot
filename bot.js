@@ -5,18 +5,15 @@ var axios = require('axios');
 var cheerio = require('cheerio');
 var Groq = require('groq-sdk');
 
-// 2. EVITARE EROARE RE-DECLARARE (Soluția pentru 12221.jpg)
-// Folosim 'global' pentru a verifica dacă 'bot' a fost deja injectat în memorie
-if (!global.botInstance) {
-    global.botInstance = new Telegraf(process.env.TELEGRAM_TOKEN);
-    console.log("🚀 [NEXUS]: Instanță nouă creată.");
-} else {
-    console.log("♻️ [NEXUS]: Instanță existentă detectată. Reutilizare...");
-}
-var bot = global.botInstance;
+// 2. TRUCUL PENTRU CONSOLĂ (Rezolvă eroarea din 12222.jpg)
+// Folosim 'delete' pentru a curăța memoria dacă există deja
+try { delete bot; } catch(e) {}
+
+// Folosim 'var' în loc de 'const' pentru că 'var' permite re-definirea
+var bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 var groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// 3. COMANDA: CAUTA
+// 3. COMENZI (Simplificate pentru viteză)
 bot.command('cauta', async (ctx) => {
     try {
         const query = ctx.message.text.split(' ').slice(1).join(' ');
@@ -26,11 +23,10 @@ bot.command('cauta', async (ctx) => {
         const $ = cheerio.load(data);
         let res = [];
         $('h3').each((i, el) => { if(i < 3) res.push(`📍 ${$(el).text()}`); });
-        ctx.reply(results.join('\n\n') || "Niciun rezultat.");
+        ctx.reply(res.join('\n\n') || "Niciun rezultat.");
     } catch (e) { ctx.reply('⚠️ Eroare Google.'); }
 });
 
-// 4. INTERACȚIUNE AI
 bot.on('text', async (ctx) => {
     try {
         const chat = await groq.chat.completions.create({
@@ -41,7 +37,7 @@ bot.on('text', async (ctx) => {
     } catch (e) { console.error("AI Error"); }
 });
 
-// 5. LANSARE SIGURĂ
+// 4. LANSARE
 bot.launch()
-    .then(() => console.log("✅ SISTEM OPERAȚIONAL"))
-    .catch((err) => console.log("ℹ️ Botul rulează deja."));
+    .then(() => console.log("🚀 NEXUS ONLINE"))
+    .catch((err) => console.log("ℹ️ Deja online."));
