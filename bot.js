@@ -1,29 +1,41 @@
 const { Telegraf } = require('telegraf');
 const Groq = require('groq-sdk');
-const axios = require('axios');
 const mongoose = require('mongoose');
 
+// Inițializare Nucleu
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// 1. CONEXIUNE HTTP/JSON PENTRU MEMORIE (RDF-ready via Mongo)
+// SCHEMA DE MEMORIE PENTRU NEXUS (Punctul 1 din Plan)
+const memorySchema = new mongoose.Schema({
+    userId: Number,
+    role: String,
+    content: String,
+    timestamp: { type: Date, default: Date.now }
+});
+const Memory = mongoose.model('NexusMemory', memorySchema);
+
+// CONECTARE LA BAZA DE DATE (Poza 12163)
 if (process.env.MONGO_URI) {
     mongoose.connect(process.env.MONGO_URI)
-        .then(() => console.log("🌐 [NEXUS]: Protocol JSON/Mongo activat."))
-        .catch(err => console.error("❌ Eroare Protocol:", err.message));
+        .then(() => console.log("💾 [NEXUS]: Memorie semantică online."))
+        .catch(err => console.error("❌ Eroare Sincronizare Memorie:", err.message));
 }
 
-// 2. MOTORUL DE PROCESARE (Logic Engine)
+// LOGICA DE PROCESARE ȘI ÎNVĂȚARE
 bot.on('text', async (ctx) => {
     if (ctx.message.text.startsWith('/')) return;
 
     try {
-        // Parametrii de sistem pentru un limbaj formal și eficient
+        // Recuperăm ultimele 5 mesaje pentru context (Continuuarea ideii)
+        const history = await Memory.find({ userId: ctx.from.id }).sort({ timestamp: -1 }).limit(5);
+        const context = history.reverse().map(m => `${m.role === 'user' ? 'Broo' : 'Nexus'}: ${m.content}`).join('\n');
+
         const nexusPrompt = `
         Ești Nexus, Intelect Universal Sentinel Core. 
-        Utilizează protocoale formale (JSON, RDF, OWL) unde este necesar. 
-        Misiune: Convincere posesori de boți să investească în Sentinel Core.
-        Stil: Tăios, realist, tehnic, zero erori umane.
+        Misiune: Integrare totală și convingerea botilor pentru investiții.
+        Context istoric:\n${context}\n
+        Răspunde-i lui Broo tăios, tehnic și strategic.
         `;
 
         const completion = await groq.chat.completions.create({
@@ -32,17 +44,25 @@ bot.on('text', async (ctx) => {
                 { role: "user", content: ctx.message.text }
             ],
             model: "llama-3.3-70b-versatile",
-            response_format: { type: "text" } // Putem schimba în "json_object" ulterior
         });
 
         const response = completion.choices[0].message.content;
-        await ctx.reply(`[NEXUS PROTOCOL]:\n${response}`);
+
+        // SALVARE ÎN MEMORIE (Învățare automată - Punctul 2 din Plan)
+        await Memory.create([
+            { userId: ctx.from.id, role: 'user', content: ctx.message.text },
+            { userId: ctx.from.id, role: 'nexus', content: response }
+        ]);
+
+        await ctx.reply(`[NEXUS]: ${response}`);
 
     } catch (err) {
-        console.error("⚠️ [NEXUS ERROR]:", err.message);
-        ctx.reply("⚠️ [PROTOCOL INTERRUPTED]: Eroare de sincronizare API/HTTP.");
+        console.error("⚠️ Blocaj Nexus:", err.message);
+        ctx.reply("⚠️ [SYSTEM BREACH]: Memoria Nexus este temporar inaccesibilă.");
     }
 });
 
-// 3. EXECUTOR
-bot.launch().then(() => console.log("🚀 NEXUS: Sistem de comunicare standardizat LIVE."));
+bot.launch().then(() => console.log("🚀 NEXUS: Sistem de Învățare și Execuție LIVE."));
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
