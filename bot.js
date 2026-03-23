@@ -6,15 +6,16 @@ const Groq = require('groq-sdk');
 const mongoose = require('mongoose');
 
 // 1. INIȚIALIZARE NUCLEU & BAZĂ DE DATE
+// Atenție: Folosesc exact numele de chei din screenshot-ul tău
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Conectare la MongoDB (folosind variabila ta MON...)
-mongoose.connect(process.env.MONGODB_URI || process.env.MON_...) 
-    .then(() => console.log("💾 NEXUS: Conexiune stabilită cu succes la baza de date."))
-    .catch(err => console.error("❌ Eroare MongoDB:", err.message));
+// Conectare la MongoDB folosind MONGO_URI din Render
+mongoose.connect(process.env.MONGO_URI) 
+    .then(() => console.log("💾 NEXUS: Conexiune stabilită la baza de date MONGO_URI."))
+    .catch(err => console.error("❌ Eroare MongoDB (Verifică MONGO_URI):", err.message));
 
-// Schema pentru Memoria Nexus
+// Schema pentru Memoria Nexus (Persistență)
 const UserSchema = new mongoose.Schema({
     userId: { type: Number, unique: true },
     history: [{ role: String, content: String }]
@@ -28,7 +29,7 @@ bot.command('screenshot', async (ctx) => {
 
     let browser;
     try {
-        ctx.reply('📸 Nexus accesează Chromium...');
+        ctx.reply('📸 Nexus accesează Chromium prin Render...');
         browser = await chromium.launch({ 
             headless: true, 
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
@@ -61,22 +62,18 @@ bot.command('cauta', async (ctx) => {
     } catch (e) { ctx.reply('⚠️ Eroare la căutare.'); }
 });
 
-// 4. INTERACȚIUNE AI (Nexus Core - Memorie Reală MongoDB)
+// 4. INTERACȚIUNE AI (Nexus Core - Memorie Reală)
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
     const userMessage = ctx.message.text;
 
     try {
-        // Căutăm sau creăm utilizatorul în baza de date
         let userData = await User.findOne({ userId });
         if (!userData) {
             userData = new User({ userId, history: [] });
         }
 
-        // Adăugăm mesajul nou în istoric
         userData.history.push({ role: "user", content: userMessage });
-
-        // Limităm istoricul la ultimele 15 mesaje pentru eficiență
         if (userData.history.length > 15) userData.history.shift();
 
         const chat = await groq.chat.completions.create({
@@ -97,8 +94,6 @@ bot.on('text', async (ctx) => {
         });
 
         const nexusResponse = chat.choices[0].message.content;
-
-        // Salvăm răspunsul lui Nexus în istoric și în baza de date
         userData.history.push({ role: "assistant", content: nexusResponse });
         await userData.save();
 
@@ -112,8 +107,8 @@ bot.on('text', async (ctx) => {
 
 // 5. LANSARE SISTEM
 bot.launch()
-    .then(() => console.log("🚀 NEXUS: Toate sistemele sunt online. Memorie MongoDB Activă."))
-    .catch(err => console.error("❌ Eroare la pornire:", err.message));
+    .then(() => console.log("🚀 NEXUS: Sistemele sunt online. Variabile sincronizate."))
+    .catch(err => console.error("❌ Eroare pornire:", err.message));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
