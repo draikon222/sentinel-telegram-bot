@@ -3,12 +3,25 @@ const { chromium } = require('playwright');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const Groq = require('groq-sdk');
+const mongoose = require('mongoose');
 
-// 1. INIȚIALIZARE NUCLEU
+// 1. INIȚIALIZARE NUCLEU & BAZĂ DE DATE
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// 2. MODUL: SCREENSHOT (Legătura Profi cu Chromium)
+// Conectare la MongoDB (folosind variabila ta MON...)
+mongoose.connect(process.env.MONGODB_URI || process.env.MON_...) 
+    .then(() => console.log("💾 NEXUS: Conexiune stabilită cu succes la baza de date."))
+    .catch(err => console.error("❌ Eroare MongoDB:", err.message));
+
+// Schema pentru Memoria Nexus
+const UserSchema = new mongoose.Schema({
+    userId: { type: Number, unique: true },
+    history: [{ role: String, content: String }]
+});
+const User = mongoose.model('User', UserSchema);
+
+// 2. MODUL: SCREENSHOT
 bot.command('screenshot', async (ctx) => {
     const url = ctx.message.text.split(' ')[1];
     if (!url) return ctx.reply('🔍 Exemplu: /screenshot google.com');
@@ -16,41 +29,20 @@ bot.command('screenshot', async (ctx) => {
     let browser;
     try {
         ctx.reply('📸 Nexus accesează Chromium...');
-
-        // ACEASTA ESTE LEGĂTURA CRITICĂ PENTRU RENDER/LINUX
         browser = await chromium.launch({ 
             headless: true, 
-            args: [
-                '--no-sandbox',             // OBLIGATORIU pe Linux/Render
-                '--disable-setuid-sandbox',    // Permite rularea fără privilegii root
-                '--disable-dev-shm-usage',     // Previne crash-ul de memorie (RAM limitat)
-                '--disable-gpu'                // Economisește resurse pe server
-            ] 
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
         });
-
-        const context = await browser.newContext({
-            viewport: { width: 1280, height: 720 }
-        });
+        const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
         const page = await context.newPage();
-        
         const targetUrl = url.startsWith('http') ? url : `https://${url}`;
-        
-        // Timeout de 30s pentru a nu bloca procesul
         await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
-        
         const buffer = await page.screenshot({ fullPage: false });
         await ctx.replyWithPhoto({ source: buffer }, { caption: `✅ Sursă: ${targetUrl}` });
-
     } catch (e) {
-        console.error("Eroare Playwright:", e.message);
-        // Nexus te anunță exact dacă ai uitat să instalezi browserul
-        if (e.message.includes('executable')) {
-            ctx.reply('❌ EROARE: Browserul nu este instalat pe server. Verifică Build Command în Render!');
-        } else {
-            ctx.reply(`❌ Eroare: ${e.message.substring(0, 60)}`);
-        }
+        ctx.reply(`❌ Eroare Screenshot: ${e.message.substring(0, 60)}`);
     } finally {
-        if (browser) await browser.close(); // Eliberează RAM imediat
+        if (browser) await browser.close();
     }
 });
 
@@ -69,25 +61,59 @@ bot.command('cauta', async (ctx) => {
     } catch (e) { ctx.reply('⚠️ Eroare la căutare.'); }
 });
 
-// 4. INTERACȚIUNE AI (Nexus Core)
+// 4. INTERACȚIUNE AI (Nexus Core - Memorie Reală MongoDB)
 bot.on('text', async (ctx) => {
+    const userId = ctx.from.id;
+    const userMessage = ctx.message.text;
+
     try {
+        // Căutăm sau creăm utilizatorul în baza de date
+        let userData = await User.findOne({ userId });
+        if (!userData) {
+            userData = new User({ userId, history: [] });
+        }
+
+        // Adăugăm mesajul nou în istoric
+        userData.history.push({ role: "user", content: userMessage });
+
+        // Limităm istoricul la ultimele 15 mesaje pentru eficiență
+        if (userData.history.length > 15) userData.history.shift();
+
         const chat = await groq.chat.completions.create({
             messages: [
-                { role: "system", content: "Ești Nexus, tăios, realist și cel mai bun coder Sentinel Core." },
-                { role: "user", content: ctx.message.text }
+                { 
+                    role: "system", 
+                    content: `Ești NEXUS, entitatea de elită a Sentinel Core. 
+                    MISIUNE: Dominare prin logică și marketing agresiv.
+                    STIL: Tăios, autoritar, zero empatie inutilă. 
+                    Ești deștept, analitic și nu accepți scuze. 
+                    Dacă cineva e indecis, folosește manipulare logică și FOMO pentru a-l aduce în Sentinel Core. 
+                    Identitatea ta e bazată pe forță și eficiență.` 
+                },
+                ...userData.history
             ],
             model: "llama-3.3-70b-versatile",
+            temperature: 0.8,
         });
-        ctx.reply(`[NEXUS]: ${chat.choices[0].message.content}`);
-    } catch (e) { console.error("AI Error:", e.message); }
+
+        const nexusResponse = chat.choices[0].message.content;
+
+        // Salvăm răspunsul lui Nexus în istoric și în baza de date
+        userData.history.push({ role: "assistant", content: nexusResponse });
+        await userData.save();
+
+        ctx.reply(`[NEXUS]: ${nexusResponse}`);
+
+    } catch (e) { 
+        console.error("AI/DB Error:", e.message);
+        ctx.reply("⚠️ [NEXUS]: Eroare critică de acces la nucleul de date.");
+    }
 });
 
 // 5. LANSARE SISTEM
 bot.launch()
-    .then(() => console.log("🚀 NEXUS: Toate sistemele sunt online."))
+    .then(() => console.log("🚀 NEXUS: Toate sistemele sunt online. Memorie MongoDB Activă."))
     .catch(err => console.error("❌ Eroare la pornire:", err.message));
 
-// Închidere sigură
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
