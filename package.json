@@ -1,21 +1,91 @@
-{
-  "name": "nexus-sentinel-core",
-  "version": "1.0.0",
-  "description": "Sentinel Core System for Broo",
-  "main": "bot.js",
-  "scripts": {
-    "start": "node bot.js",
-    "postinstall": "npx playwright install --with-deps chromium"
-  },
-  "dependencies": {
-    "telegraf": "^4.16.3",
-    "playwright": "^1.42.1",
-    "axios": "^1.6.7",
-    "cheerio": "^1.0.0-rc.12",
-    "groq-sdk": "^0.3.0",
-    "mongoose": "^8.2.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
+const { Telegraf } = require('telegraf');
+const { chromium } = require('playwright');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const Groq = require('groq-sdk');
+
+// 1. INIȚIALIZARE NUCLEU
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// 2. MODUL: SCREENSHOT (Liantul Chromium pentru Linux/Render)
+bot.command('screenshot', async (ctx) => {
+    const url = ctx.message.text.split(' ')[1];
+    if (!url) return ctx.reply('🔍 Exemplu: /screenshot google.com');
+
+    let browser;
+    try {
+        ctx.reply('📸 Nexus inițializează Chromium pe server...');
+
+        // ACEASTA ESTE CONFIGURAȚIA "PROFI" PENTRU RENDER
+        browser = await chromium.launch({ 
+            headless: true, 
+            args: [
+                '--no-sandbox',             // Critic pentru Linux
+                '--disable-setuid-sandbox',    // Permite execuția fără drepturi root
+                '--disable-dev-shm-usage',     // Evită crash-ul din cauza RAM-ului limitat
+                '--disable-gpu'                // Economisește procesorul serverului
+            ] 
+        });
+
+        const context = await browser.newContext({
+            viewport: { width: 1280, height: 720 }
+        });
+        const page = await context.newPage();
+        
+        const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+        
+        // Timeout de 30 secunde să nu blocăm procesul la infinit
+        await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
+        
+        const buffer = await page.screenshot({ fullPage: false });
+        await ctx.replyWithPhoto({ source: buffer }, { caption: `✅ Captură reușită: ${targetUrl}` });
+
+    } catch (e) {
+        console.error("Eroare Playwright:", e.message);
+        // Dacă ai omis instalarea, Nexus te anunță
+        if (e.message.includes('executable')) {
+            ctx.reply('❌ EROARE SISTEM: Browserul nu este instalat pe Render. Verifică scriptul de postinstall!');
+        } else {
+            ctx.reply(`❌ Eroare vizuală: ${e.message.substring(0, 60)}`);
+        }
+    } finally {
+        if (browser) await browser.close(); // Întotdeauna închidem browserul să nu "mănânce" RAM
+    }
+});
+
+// 3. MODUL: CAUTA (Google Scraper)
+bot.command('cauta', async (ctx) => {
+    const query = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!query) return ctx.reply('🔎 Ce cauți, Broo?');
+    try {
+        const { data } = await axios.get(`https://www.google.com/search?q=${encodeURIComponent(query)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const $ = cheerio.load(data);
+        let results = [];
+        $('h3').slice(0, 4).each((i, el) => results.push(`📍 ${$(el).text()}`));
+        ctx.reply(`Rezultate Google:\n\n${results.join('\n\n')}`);
+    } catch (e) { ctx.reply('⚠️ Eroare la căutare Google.'); }
+});
+
+// 4. INTERACȚIUNE AI (Nexus Core)
+bot.on('text', async (ctx) => {
+    try {
+        const chat = await groq.chat.completions.create({
+            messages: [
+                { role: "system", content: "Ești Nexus, tăios, realist și cel mai bun coder Sentinel Core. Răspunde scurt și precis." },
+                { role: "user", content: ctx.message.text }
+            ],
+            model: "llama-3.3-70b-versatile",
+        });
+        ctx.reply(`[NEXUS]: ${chat.choices[0].message.content}`);
+    } catch (e) { console.error("AI Error:", e.message); }
+});
+
+// 5. PORNIRE SISTEM
+bot.launch().then(() => console.log("🚀 NEXUS: Toate sistemele sunt online."));
+
+// Graceful shutdown
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
